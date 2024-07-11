@@ -5,6 +5,15 @@
 #include <math.h>
 #include <chrono>
 
+/*
+TODO:
+1. Map in the upper left corner
+2. Health in the upper right
+3. Picking up apples restores health
+4. Zombie that run to you and deal damage
+5. Shooting
+*/
+
 class Player
 {
 private:
