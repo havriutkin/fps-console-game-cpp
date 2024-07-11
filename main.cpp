@@ -5,17 +5,6 @@
 #include <math.h>
 #include <chrono>
 
-
-int nScreenWidth = 120;
-int nScreenHeight = 40;
-
-int nMapWidth = 16;
-int nMapHeight = 16;
-
-float fFOV = 3.14159f / 4.0f;
-float fDepth = 16.0f;
-float fRotationSpeed = 0.4f;
-
 class Player
 {
 private:
@@ -71,7 +60,6 @@ public:
     }
 };
 
-
 class Game
 {
 private:
@@ -115,19 +103,19 @@ private:
     void setUpMap()
     {
         this->map += L"################";
-        this->map += L"#..............#";
+        this->map += L"#####..........#";
         this->map += L"#..............#";
         this->map += L"#..........##..#";
         this->map += L"#..........##..#";
+        this->map += L"#...###........#";
+        this->map += L"#...###........#";
+        this->map += L"#...###........#";
         this->map += L"#..............#";
-        this->map += L"#..............#";
-        this->map += L"#..............#";
-        this->map += L"#..............#";
-        this->map += L"#..............#";
+        this->map += L"#.......###.....#";
         this->map += L"#..............#";
         this->map += L"#..............#";
         this->map += L"#......##......#";
-        this->map += L"#..............#";
+        this->map += L"#......##......#";
         this->map += L"#..............#";
         this->map += L"################";
     }
