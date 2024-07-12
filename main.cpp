@@ -217,6 +217,20 @@ private:
         }
     }
 
+    void displayMap()
+    {
+        for (int x = 0; x < this->nMapWidth; x++) 
+        {
+            for (int y = 0; y < this->nMapHeight; y++)
+            {
+                this->screen[(y + 1) * this->nScreenWidth + x] = this->map[y * this->nMapWidth + x]; 
+                this->attributes[(y + 1) * this->nScreenWidth + x] = FOREGROUND_GREEN;
+            }
+        }
+        this->screen[(int)this->player.getPosX() * this->nScreenWidth + (int)this->player.getPosY()] = 'P';
+        this->attributes[(int)this->player.getPosX() * this->nScreenWidth + (int)this->player.getPosY()] = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+    }
+
     void render()
     {
         for (int x = 0; x < this->nScreenWidth; x++) 
@@ -257,6 +271,8 @@ private:
 
             this->renderRow(fDistance, x);
         }
+
+        this->displayMap();
     }
 
 public:
