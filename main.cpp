@@ -69,6 +69,40 @@ public:
     }
 };
 
+class Bullet
+{
+private:
+    float fPosX;
+    float fPosY;
+    float fAngle;
+    float fSpeed = 1.6f;
+public:
+    Bullet()
+    {
+        this->fPosX = -1;
+        this->fPosY = -1;
+        this->fAngle = -1;
+    }
+
+    Bullet(float x, float y, float a)
+    {
+        this->fPosX = x;
+        this->fPosY = y;
+        this->fAngle = a;
+    }
+
+    void move(float dt)
+    {
+        this->fPosX += sinf(this->fAngle) * this->fSpeed * dt;
+        this->fPosY += cosf(this->fAngle) * this->fSpeed * dt;
+    }
+
+    std::pair<float, float> getPos() { return {this->fPosX, this->fPosY}; }
+    float getPosX() { return this->fPosX; }
+    float getPosY() { return this->fPosY; }
+    float getAngle() { return this->fAngle; }
+};
+
 class Game
 {
 private:
@@ -84,6 +118,8 @@ private:
     float fCheckStep = 0.1;
 
     Player player;
+    Bullet bullet;
+    boolean bBullet = false;
 
     std::wstring map;
     float fElapsedTime = 0.0f;
@@ -120,7 +156,7 @@ private:
         this->map += L"#...###........#";
         this->map += L"#...###........#";
         this->map += L"#..............#";
-        this->map += L"#.......###.....#";
+        this->map += L"#.......###....#";
         this->map += L"#..............#";
         this->map += L"#..............#";
         this->map += L"#......##......#";
@@ -186,6 +222,12 @@ private:
                 player.moveForward(this->fElapsedTime);
             }
         }
+    
+        if (GetAsyncKeyState((unsigned short)'F') & 0x8000)
+        {
+            this->bullet = Bullet(this->player.getPosX(), this->player.getPosY(), this->player.getAngle());
+            this->bBullet = true;
+        }
     }
 
     void renderRow(float fDistance, int x)
@@ -231,6 +273,16 @@ private:
         this->attributes[(int)this->player.getPosX() * this->nScreenWidth + (int)this->player.getPosY()] = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
     }
 
+    void displayStats() 
+    {
+        std::wstring stats = L"X=%3.2f, Y=%3.2f, A=%3.2f FPS=%3.2f";
+        swprintf_s(screen, stats.size(), L"X=%3.2f, Y=%3.2f, A=%3.2f FPS=%3.2f", this->player.getPosX(), this->player.getPosY(),
+                    this->player.getAngle(), 1.0f/this->fElapsedTime);
+        for (int i = 0; i < stats.size(); i++) {
+            this->attributes[i] = FOREGROUND_GREEN;
+        }
+    }
+
     void render()
     {
         for (int x = 0; x < this->nScreenWidth; x++) 
@@ -257,7 +309,7 @@ private:
                 // Check if wall was hit
                 if (0 <= pMapCoord.first && pMapCoord.first < nMapWidth && 0 <= pMapCoord.second && pMapCoord.second < nMapHeight)
                 {
-                    if (map[pMapCoord.first * nMapWidth + pMapCoord.second] == '#') 
+                    if (map[pMapCoord.first * nMapWidth + pMapCoord.second] == '#' || map[pMapCoord.first * nMapWidth + pMapCoord.second] == 'B') 
                     {
                         bHitWall = true;
                     }
@@ -273,6 +325,7 @@ private:
         }
 
         this->displayMap();
+        this->displayStats();
     }
 
 public:
@@ -302,6 +355,14 @@ public:
             this->fElapsedTime = elapsedTime.count();
 
             handleInput();
+
+            if (this->bBullet) 
+            {
+                this->bullet.move(this->fElapsedTime);
+                this->map[(int)this->bullet.getPosX() * this->nScreenWidth + (int)this->bullet.getPosY()] = 'B';
+                this->attributes[(int)this->bullet.getPosX() * this->nScreenWidth + (int)this->bullet.getPosY()] = FOREGROUND_RED | FOREGROUND_BLUE;
+            }
+
             render();
 
             // Draw
