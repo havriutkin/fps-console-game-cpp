@@ -4,103 +4,136 @@
 #include <vector>
 #include <math.h>
 #include <chrono>
+#include <geomerty.cpp>
 
-/*
-TODO:
-1. Map in the upper left corner
-2. Health in the upper right
-3. Picking up apples restores health
-4. Zombie that run to you and deal damage
-5. Shooting
-*/
 
-class Player
+// 1 map square is MAP_WORLD_RATION worlds' "squares"
+const int N_MAP_WORLD_RATIO = 5;
+const int N_SCREEN_WORLD_RATION = 8;
+
+class GameObject 
+{
+protected:
+    Vector3D v3CenterWorldPos;           // Center of the object 
+    std::vector<Vector3D> vv3Points;     // Points that represent that object in space;
+    std::vector<float> fMapPos;          // Position in map coordinates
+    WORD wPixelColor;
+    float fSpeed;
+
+    // Fills up vv3Points array
+    virtual void calculateObjectPoints();
+
+public:
+    GameObject()
+    {
+        v3CenterWorldPos = Vector3D();
+        vv3Points = {};
+        fMapPos = {-1, -1};
+        wPixelColor = 0; // BLACK;
+        this->fSpeed = 0;
+    }
+
+    GameObject(Vector3D centerPos, WORD color, float speed)
+    {
+        v3CenterWorldPos = centerPos;
+        vv3Points = {};
+        fMapPos = {centerPos[0] / N_MAP_WORLD_RATIO, centerPos[1] / N_MAP_WORLD_RATIO};
+        wPixelColor = color;
+        this->fSpeed = speed;
+        this->calculateObjectPoints();
+    }
+
+    Vector3D getCenterPos() { return this->v3CenterWorldPos; }
+
+
+    // Returns distance to the closest point that belongs to object and lies on the line, 
+    //     returns -1 if there is not points on the line
+    virtual float getIntersectionDistance(Line line);
+
+    void move(Vector3D direction, float dt)
+    {
+        direction.normalize();
+
+        this->v3CenterWorldPos = this->v3CenterWorldPos + direction * this->fSpeed * dt;
+        fMapPos = {this->v3CenterWorldPos[0] / N_MAP_WORLD_RATIO, this->v3CenterWorldPos[1] / N_MAP_WORLD_RATIO};
+
+        this->calculateObjectPoints();
+    }
+
+
+};
+
+class Cube: GameObject
 {
 private:
-    float fPosX;
-    float fPosY;
-    float fAngle;
-    float fSpeed;
-    float fRotationSpeed;
+
+    void calculateObjectPoints()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            for (int j = 0; j < 5; j++)
+            {
+                for (int k = 0; k < 5; k++)
+                {
+                    Vector3D v3Point;
+                    v3Point[0] = this->v3CenterWorldPos[0] + i;
+                    v3Point[1] = this->v3CenterWorldPos[1] + j;
+                    v3Point[2] = this->v3CenterWorldPos[2] + k;
+                    this->vv3Points.push_back(v3Point);
+                }
+            }
+        }
+    };
 public:
-    Player()
-    {
-        this->fPosX = 0.0;
-        this->fPosY = 0.0;
-        this->fAngle = 0.0;
-        this->fSpeed = 0.0f;
-        this->fRotationSpeed = 0.0f;
-    }
+    Cube(Vector3D centerPos, WORD color, float speed): GameObject(centerPos, color, speed) {};
 
-    Player(float x, float y)
+    float getIntersectionDistance(Line line)
     {
-        this->fPosX = x;
-        this->fPosY = y;
-        this->fAngle = 0.0;
-        this->fSpeed = 0.8f;
-        this->fRotationSpeed = 0.5f;
-    }
+        float result = INT_MAX;
+        for (Vector3D point: vv3Points)
+        {
+            float distance = line.getParameter(point);
+            if (distance == 0)
+            {
+                continue;
+            }
 
-    std::pair<float, float> getPos() { return {this->fPosX, this->fPosY}; }
-    float getPosX() { return this->fPosX; }
-    float getPosY() { return this->fPosY; }
-    float getAngle() { return this->fAngle; }
-
-    void setPos(std::pair<float, float> newPos) 
-    {
-        this->fPosX = newPos.first;
-        this->fPosY = newPos.second;
-    }
-
-    void setPosX(float x) { this->fPosX = x; }
-    void setPosY(float y) { this->fPosY = y; }
-    void setAngle(float a) { this->fAngle = a; }
-    void rotateAngle(int dir, float dt) { this->fAngle += dir * this->fRotationSpeed * dt; }
-    void moveForward(float dt)
-    {
-        this->fPosX += sinf(this->fAngle) * this->fSpeed * dt;
-        this->fPosY += cosf(this->fAngle) * this->fSpeed * dt;
-    }
-
-    void moveBackward(float dt)
-    {
-        this->fPosX -= sinf(this->fAngle) * this->fSpeed * dt;
-        this->fPosY -= cosf(this->fAngle) * this->fSpeed * dt;
+            if (distance < result)
+            {
+                result = distance;
+            }
+        }
     }
 };
 
-class Bullet
+class Player: GameObject
 {
 private:
-    float fPosX;
-    float fPosY;
     float fAngle;
-    float fSpeed = 1.6f;
+    float fRotationSpeed;
+
+    // Fills up vv3Points array
+    virtual void calculateObjectPoints()
+    {
+        this->vv3Points = {};
+    }
+
 public:
-    Bullet()
+    Player(): GameObject()
     {
-        this->fPosX = -1;
-        this->fPosY = -1;
-        this->fAngle = -1;
+        this->fAngle = 0.0;
+        this->fRotationSpeed = 0.0f;
     }
 
-    Bullet(float x, float y, float a)
+    Player(Vector3D centerPos, float speed): GameObject(centerPos, 0, speed)
     {
-        this->fPosX = x;
-        this->fPosY = y;
-        this->fAngle = a;
+        this->fAngle = 0.0;
+        this->fRotationSpeed = 0.5f;
     }
 
-    void move(float dt)
-    {
-        this->fPosX += sinf(this->fAngle) * this->fSpeed * dt;
-        this->fPosY += cosf(this->fAngle) * this->fSpeed * dt;
-    }
-
-    std::pair<float, float> getPos() { return {this->fPosX, this->fPosY}; }
-    float getPosX() { return this->fPosX; }
-    float getPosY() { return this->fPosY; }
     float getAngle() { return this->fAngle; }
+
+    void rotateAngle(int dir, float dt) { this->fAngle += dir * this->fRotationSpeed * dt; }
 };
 
 class Game
@@ -109,17 +142,16 @@ private:
     // Game settings
     int nScreenWidth = 120;
     int nScreenHeight = 40;
+    int nScreenWorldWidth = 15;
+    int nScreenWorldHeight = 5;
+    float fFocalLength = 5.0f;  // Distance from player to console screen in world
 
     int nMapWidth = 16;
     int nMapHeight = 16;
 
-    float fFOV = 3.14159f / 4.0f;
     float fDepth = 16.0f;
-    float fCheckStep = 0.1;
 
     Player player;
-    Bullet bullet;
-    boolean bBullet = false;
 
     std::wstring map;
     float fElapsedTime = 0.0f;
@@ -185,50 +217,6 @@ private:
         return ' ';
     }
 
-    void handleInput()
-    {
-        if (GetAsyncKeyState((unsigned short)'A') & 0x8000) 
-        {
-            player.rotateAngle(-1, this->fElapsedTime);
-        }
-
-        if (GetAsyncKeyState((unsigned short)'D') & 0x8000)
-        {
-            player.rotateAngle(1, this->fElapsedTime);
-        }
-
-        if (GetAsyncKeyState((unsigned short)'W') & 0x8000)
-        {
-            player.moveForward(this->fElapsedTime);
-            
-            int newX = (int)player.getPosX();
-            int newY = (int)player.getPosY();
-            
-            if (this->map[newX * nMapWidth + newY] == '#') 
-            {
-                player.moveBackward(this->fElapsedTime);
-            }
-        }
-
-        if (GetAsyncKeyState((unsigned short)'S') & 0x8000)
-        {
-            player.moveBackward(this->fElapsedTime);
-
-            int newX = (int)player.getPosX();
-            int newY = (int)player.getPosY();
-            
-            if (this->map[newX * nMapWidth + newY] == '#') 
-            {
-                player.moveForward(this->fElapsedTime);
-            }
-        }
-    
-        if (GetAsyncKeyState((unsigned short)'F') & 0x8000)
-        {
-            this->bullet = Bullet(this->player.getPosX(), this->player.getPosY(), this->player.getAngle());
-            this->bBullet = true;
-        }
-    }
 
     void renderRow(float fDistance, int x)
     {
@@ -283,45 +271,64 @@ private:
         }
     }
 
+
+    void handleInput()
+    {
+        if (GetAsyncKeyState((unsigned short)'A') & 0x8000) 
+        {
+            player.rotateAngle(-1, this->fElapsedTime);
+        }
+
+        if (GetAsyncKeyState((unsigned short)'D') & 0x8000)
+        {
+            player.rotateAngle(1, this->fElapsedTime);
+        }
+
+        if (GetAsyncKeyState((unsigned short)'W') & 0x8000)
+        {
+            player.moveForward(this->fElapsedTime);
+            
+            int newX = (int)player.getPosX();
+            int newY = (int)player.getPosY();
+            
+            if (this->map[newX * nMapWidth + newY] == '#') 
+            {
+                player.moveBackward(this->fElapsedTime);
+            }
+        }
+
+        if (GetAsyncKeyState((unsigned short)'S') & 0x8000)
+        {
+            player.moveBackward(this->fElapsedTime);
+
+            int newX = (int)player.getPosX();
+            int newY = (int)player.getPosY();
+            
+            if (this->map[newX * nMapWidth + newY] == '#') 
+            {
+                player.moveForward(this->fElapsedTime);
+            }
+        }
+    }
+
+    void update()
+    {
+
+    }
+
     void render()
     {
-        for (int x = 0; x < this->nScreenWidth; x++) 
+        for (int y = 0; y < this->nScreenHeight; y++) 
         {
-            // Cast ray for every column
-            float fRay = (player.getAngle() - fFOV / 2.0) + ((float)x / (float)nScreenWidth) * fFOV;
-            std::pair<float, float> pPlayerPos = player.getPos();
-            std::pair<float, float> pRayVector = { sinf(fRay), cosf(fRay) };
-            float fDistance = 0.0f;
-            boolean bHitWall = false;
+            for (int x = 0; x < this->nScreenWidth; x++)
+            {
 
-            // Find distance to wall in that direction
-            while (!bHitWall && fDistance < fDepth) 
-            {   
-                fDistance += this->fCheckStep;
-                
-                // Cast to int to get int map coordinates
-                std::pair<int, int> pMapCoord = 
-                {
-                    (int)(pPlayerPos.first + pRayVector.first * fDistance),
-                    (int)(pPlayerPos.second + pRayVector.second * fDistance)
-                };
-
-                // Check if wall was hit
-                if (0 <= pMapCoord.first && pMapCoord.first < nMapWidth && 0 <= pMapCoord.second && pMapCoord.second < nMapHeight)
-                {
-                    if (map[pMapCoord.first * nMapWidth + pMapCoord.second] == '#' || map[pMapCoord.first * nMapWidth + pMapCoord.second] == 'B') 
-                    {
-                        bHitWall = true;
-                    }
-                } 
-                else 
-                {
-                    bHitWall = true;
-                    fDistance = fDepth;
-                }
-            }
-
-            this->renderRow(fDistance, x);
+                // Cast ray for every column
+                float fRayAngle = (player.getAngle() - fFOV / 2.0) + ((float)x / (float)nScreenWidth) * fFOV;
+                Line lRay(this->player.getCenterPos(), Vector3D())
+                std::pair<float, float> pPlayerPos = player.getPos();
+                std::pair<float, float> pRayVector = { sinf(fRay), cosf(fRay) };
+            }            
         }
 
         this->displayMap();
@@ -355,14 +362,7 @@ public:
             this->fElapsedTime = elapsedTime.count();
 
             handleInput();
-
-            if (this->bBullet) 
-            {
-                this->bullet.move(this->fElapsedTime);
-                this->map[(int)this->bullet.getPosX() * this->nScreenWidth + (int)this->bullet.getPosY()] = 'B';
-                this->attributes[(int)this->bullet.getPosX() * this->nScreenWidth + (int)this->bullet.getPosY()] = FOREGROUND_RED | FOREGROUND_BLUE;
-            }
-
+            update();
             render();
 
             // Draw
