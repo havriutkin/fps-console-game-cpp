@@ -132,28 +132,8 @@ public:
             }
             
             if (localDistance > 0 && localDistance < result)
-            {          
-                const float tolerance = 0.01f; // Adjust the tolerance value as needed
-
-                bool onEdge = (
-                    (fabs(point[0] - this->fMinX) < tolerance || fabs(point[0] - this->fMaxX) < tolerance) &&
-                    (fabs(point[1] - this->fMinY) < tolerance || fabs(point[1] - this->fMaxY) < tolerance)
-                ) || (
-                    (fabs(point[0] - this->fMinX) < tolerance || fabs(point[0] - this->fMaxX) < tolerance) &&
-                    (fabs(point[2] - this->fMinZ) < tolerance || fabs(point[2] - this->fMaxZ) < tolerance)
-                ) || (
-                    (fabs(point[1] - this->fMinY) < tolerance || fabs(point[1] - this->fMaxY) < tolerance) &&
-                    (fabs(point[2] - this->fMinZ) < tolerance || fabs(point[2] - this->fMaxZ) < tolerance)
-                );
-
-                if (onEdge)
-                {
-                    resChar = '#';
-                }
-                else
-                {
-                    resChar = this->getCharByDistance(depth, localDistance);
-                }
+            {       
+                resChar = this->getCharByDistance(depth, localDistance);
                 result = localDistance;
             }
         }
@@ -269,7 +249,7 @@ private:
     int nMapWidth = 16;
     int nMapHeight = 16;
 
-    float fDepth = 40.0f;
+    float fDepth = 60.0f;
 
     Player player;
     std::vector<GameObject*> objects;
@@ -413,20 +393,35 @@ private:
         Vector3D playerPos = this->player.getCenterPos();
         float playerAngle = this->player.getAngle();
 
+        // Aspect ratio and FOV
+        float aspectRatio = (float)this->nScreenWidth / (float)this->nScreenHeight;
+        float fov = 3.14159 / 4.0; // 45 degree field of view
+
+        // Calculate the center of the screen in world coordinates
         Vector3D screenCenterWorldPos = playerPos + Vector3D(cosf(playerAngle) * this->fFocalLength, sinf(playerAngle) * this->fFocalLength, 0.0f);
-        Vector3D screenRightVector = Vector3D(-sinf(playerAngle), cosf(playerAngle), 0.0f) * (this->nScreenWidth / 2.0f / (float)N_SCREEN_WORLD_RATIO);
-        Vector3D screenDownVector = Vector3D(0.0f, 0.0f, -1.0f) * (this->nScreenHeight / 2.0f / (float)N_SCREEN_WORLD_RATIO);
-        Vector3D v3ScreenTopLeft = screenCenterWorldPos - screenRightVector - screenDownVector;
+
 
         for (int y = 0; y < this->nScreenHeight; y++) 
         {
             for (int x = 0; x < this->nScreenWidth; x++)
             {
-                // Cast ray for every column
-                Vector3D currPoint = v3ScreenTopLeft + screenRightVector * 2.0f * (x / (float)this->nScreenWidth) + screenDownVector * 2.0f * (y / (float)this->nScreenHeight);
+                // Calculate normalized device coordinates (NDC)
+                float ndcX = (2.0f * x / (float)this->nScreenWidth - 1.0f) * aspectRatio;
+                float ndcY = 1.0f - 2.0f * y / (float)this->nScreenHeight;
 
-                Vector3D v3RayDirection = currPoint - playerPos;
-                Line lRay(playerPos, v3RayDirection);
+                // Calculate the direction of the ray in camera space
+                float rayDirX = 1.0f; // Looking along the x-axis initially
+                float rayDirY = ndcX * tanf(fov / 2.0f);
+                float rayDirZ = ndcY * tanf(fov / 2.0f);
+
+                // Rotate the ray direction to align with the player's view direction
+                Vector3D rayDirection = Vector3D(
+                    cosf(playerAngle) * rayDirX - sinf(playerAngle) * rayDirY,
+                    sinf(playerAngle) * rayDirX + cosf(playerAngle) * rayDirY,
+                    rayDirZ
+                );
+                rayDirection.normalize(); // Normalize the direction
+                Line lRay(playerPos, rayDirection);
 
                 // Find nearest seen object
                 float fDistance = this->fDepth; // Init with depth limit
