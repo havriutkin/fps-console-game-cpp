@@ -397,15 +397,11 @@ private:
         float aspectRatio = (float)this->nScreenWidth / (float)this->nScreenHeight;
         float fov = 3.14159 / 4.0; // 45 degree field of view
 
-        // Calculate the center of the screen in world coordinates
-        Vector3D screenCenterWorldPos = playerPos + Vector3D(cosf(playerAngle) * this->fFocalLength, sinf(playerAngle) * this->fFocalLength, 0.0f);
-
-
         for (int y = 0; y < this->nScreenHeight; y++) 
         {
             for (int x = 0; x < this->nScreenWidth; x++)
             {
-                // Calculate normalized device coordinates (NDC)
+                // Calculate normalized device coordinates
                 float ndcX = (2.0f * x / (float)this->nScreenWidth - 1.0f) * aspectRatio;
                 float ndcY = 1.0f - 2.0f * y / (float)this->nScreenHeight;
 
@@ -420,7 +416,6 @@ private:
                     sinf(playerAngle) * rayDirX + cosf(playerAngle) * rayDirY,
                     rayDirZ
                 );
-                rayDirection.normalize(); // Normalize the direction
                 Line lRay(playerPos, rayDirection);
 
                 // Find nearest seen object
