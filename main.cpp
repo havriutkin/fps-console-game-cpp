@@ -11,7 +11,7 @@
 
 // 1 map square is MAP_WORLD_RATION worlds' "squares"
 const int N_MAP_WORLD_RATIO = 5;
-const int N_SCREEN_WORLD_RATIO = 8;
+const int N_SCREEN_WORLD_RATIO = 10;
 
 
 // Dev
@@ -62,7 +62,7 @@ public:
 
     // Returns distance to the closest point that belongs to object and lies on the line, 
     //     returns -1 if there is not points on the line
-    virtual float getIntersectionDistance(Line line) = 0;
+    virtual std::pair<float, WORD> getIntersection(Line line, float depth) = 0;
 
     virtual WORD getCharByDistance(float depth, float distance) = 0;
 };
@@ -79,7 +79,7 @@ private:
 public:
     Cube(Vector3D centerPos, WORD objectChar, WORD color, float speed): GameObject(centerPos, objectChar, color, speed) 
     {
-        this->size = 5.0f;
+        this->size = 2.5f;
 
         this->fMinX = centerPos[0] - size < centerPos[0] + size ? centerPos[0] - size : centerPos[0] + size;
         this->fMaxX = centerPos[0] - size > centerPos[0] + size ? centerPos[0] - size : centerPos[0] + size;
@@ -96,9 +96,19 @@ public:
         planes.push_back(new Plane(Vector3D(centerPos[0], centerPos[1], centerPos[2] + size), Vector3D(0, 0, 1)));  // Back
     };
 
-    float getIntersectionDistance(Line line)
+    WORD getCharByDistance(float depth, float distance)
+    {
+        if (distance <= depth / 2.0f)	    { return 0x2588; }	// Close	
+        else if (distance < depth / 1.75f)	{ return 0x2593; }
+        else if (distance < depth / 1.5f)	{ return 0x2592; }
+        else if (distance < depth)	{ return 0x2591; }
+        return ' ';
+    }
+
+    std::pair<float, WORD> getIntersection(Line line, float depth = 16.0f)
     {
         float result = INT_MAX;
+        WORD resChar = ' ';
         for(const Plane* plane: this->planes)
         {
             std::pair<Vector3D, float> localRes = plane->getLineIntersection(line);
@@ -122,22 +132,93 @@ public:
             }
             
             if (localDistance > 0 && localDistance < result)
-            {
+            {          
+                const float tolerance = 0.01f; // Adjust the tolerance value as needed
+
+                bool onEdge = (
+                    (fabs(point[0] - this->fMinX) < tolerance || fabs(point[0] - this->fMaxX) < tolerance) &&
+                    (fabs(point[1] - this->fMinY) < tolerance || fabs(point[1] - this->fMaxY) < tolerance)
+                ) || (
+                    (fabs(point[0] - this->fMinX) < tolerance || fabs(point[0] - this->fMaxX) < tolerance) &&
+                    (fabs(point[2] - this->fMinZ) < tolerance || fabs(point[2] - this->fMaxZ) < tolerance)
+                ) || (
+                    (fabs(point[1] - this->fMinY) < tolerance || fabs(point[1] - this->fMaxY) < tolerance) &&
+                    (fabs(point[2] - this->fMinZ) < tolerance || fabs(point[2] - this->fMaxZ) < tolerance)
+                );
+
+                if (onEdge)
+                {
+                    resChar = '#';
+                }
+                else
+                {
+                    resChar = this->getCharByDistance(depth, localDistance);
+                }
                 result = localDistance;
             }
         }
-
-        return sqrtf(result);
+        return { sqrtf(result), resChar };
     }
     
+};
+
+class Floor: public GameObject
+{
+private:
+    Plane plane;
+
+public:
+    Floor(WORD color): GameObject(Vector3D(0, 0, 0), 'x', color, 0.0f) 
+    {
+        this->plane = Plane(Vector3D(0, 0, 0.0f), Vector3D(0, 0, 1.0f));
+    };
+
     WORD getCharByDistance(float depth, float distance)
     {
-        if (distance <= depth / 4.0f)	    { return 0x2588; }	// Close	
-        else if (distance < depth / 3.0f)	{ return 0x2593; }
-        else if (distance < depth / 2.0f)	{ return 0x2592; }
-        else if (distance < depth)			{ return 0x2591; }
+        if (distance <= 4.0f)      { return '#'; }
+        else if (distance < 8.0f)  { return 'x'; }
+        else if (distance < 12.0f) { return '-'; }
+        else if (distance < 16.0f)  { return '.'; }
+        
+        return '.';
+    }
 
-        return ' ';
+    std::pair<float, WORD> getIntersection(Line line, float depth = 16.0f)
+    {
+        WORD resChar = ' ';
+        std::pair<Vector3D, float> localRes = this->plane.getLineIntersection(line);
+        resChar = this->getCharByDistance(16.0f, localRes.second);
+        return { sqrtf(localRes.second), resChar };
+    }
+};
+
+class Ceiling: public GameObject
+{
+private:
+    Plane plane;
+
+public:
+    Ceiling(WORD color): GameObject(Vector3D(0, 0, 0), 'x', color, 0.0f) 
+    {
+        this->plane = Plane(Vector3D(0, 0, 5.0f), Vector3D(0, 0, 1.0f));
+    };
+
+    WORD getCharByDistance(float depth, float distance)
+    {
+        if (distance <= 2.0f)      { return '#'; }
+        else if (distance < 4.0f)  { return 'x'; }
+        else if (distance < 6.0f) { return '-'; }
+        else if (distance < 8.0f)  { return '.'; }
+        
+        return '.';
+    }
+
+    std::pair<float, WORD> getIntersection(Line line, float depth = 16.0f)
+    {
+        WORD resChar = ' ';
+        std::pair<Vector3D, float> localRes = this->plane.getLineIntersection(line);
+        resChar = this->getCharByDistance(16.0f, localRes.second);
+        return { sqrtf(localRes.second), resChar };
     }
 };
 
@@ -164,9 +245,9 @@ public:
 
     void rotateAngle(int dir, float dt) { this->fAngle += dir * this->fRotationSpeed * dt; }
 
-    float getIntersectionDistance(Line line)
+    std::pair<float, WORD> getIntersection(Line line, float depth = 16.0f)
     {
-        return -1;
+        return { -1, ' ' };
     }
 
     WORD getCharByDistance(float depth, float distance)
@@ -178,18 +259,17 @@ public:
 class Game
 {
 private:
-
     // Game settings
     int nScreenWidth = 120;
     int nScreenHeight = 40;
-    int nScreenWorldWidth = 15;
-    int nScreenWorldHeight = 5;
+    int nScreenWorldWidth = 12;
+    int nScreenWorldHeight = 4;
     float fFocalLength = 1.0f;  // Distance from player to console screen in world
 
     int nMapWidth = 16;
     int nMapHeight = 16;
 
-    float fDepth = 16.0f;
+    float fDepth = 40.0f;
 
     Player player;
     std::vector<GameObject*> objects;
@@ -227,7 +307,7 @@ private:
         this->map += L"#..............#";
         this->map += L"#..............#";
         this->map += L"#..............#";
-        this->map += L"#..............#";
+        this->map += L"#........##....#";
         this->map += L"#..............#";
         this->map += L"#..............#";
         this->map += L"#..............#";
@@ -247,22 +327,14 @@ private:
                 wchar_t currChar = map[y * nMapWidth + x];
                 if (currChar == '#')
                 {
-                    Vector3D centerPos(x * N_MAP_WORLD_RATIO, y * N_MAP_WORLD_RATIO, 5.0f);
+                    Vector3D centerPos(x * N_MAP_WORLD_RATIO, y * N_MAP_WORLD_RATIO, 2.5f);
                     Cube* newCube = new Cube(centerPos, '#', FOREGROUND_BLUE, 0.0f);
                     this->objects.push_back(newCube);
                 }
             }
         }
-    }
-
-    wchar_t getFloorCharByDistance(float distance) 
-    {
-        if (distance < 0.25)      { return '#'; }
-        else if (distance < 0.5)  { return 'x'; }
-        else if (distance < 0.75) { return '.'; }
-        else if (distance < 0.9)  { return '-'; }
-        
-        return ' ';
+        this->objects.push_back(new Floor(FOREGROUND_RED));     // Floor
+        this->objects.push_back(new Ceiling(FOREGROUND_RED | FOREGROUND_GREEN));
     }
 
     void displayMap()
@@ -308,13 +380,13 @@ private:
 
         if (GetAsyncKeyState((unsigned short)'W') & 0x8000)
         {
-            Vector3D direction(sinf(player.getAngle()), cosf(player.getAngle()), 0.0f);
+            Vector3D direction(cosf(player.getAngle()), sinf(player.getAngle()), 0.0f);
             player.move(direction, this->fElapsedTime);
         }
 
         if (GetAsyncKeyState((unsigned short)'S') & 0x8000)
         {
-            Vector3D direction(sinf(player.getAngle()), cosf(player.getAngle()), 0.0f);
+            Vector3D direction(cosf(player.getAngle()), sinf(player.getAngle()), 0.0f);
             player.move(direction * -1, this->fElapsedTime);
         }
 
@@ -340,24 +412,18 @@ private:
     {
         Vector3D playerPos = this->player.getCenterPos();
         float playerAngle = this->player.getAngle();
-        Vector3D screenCenterWorldPos = playerPos + Vector3D(sinf(playerAngle) * this->fFocalLength, cosf(playerAngle) * this->fFocalLength, 0.0f);
-        Vector3D screenRightVector = Vector3D(sinf(playerAngle), -cosf(playerAngle), 0.0f) * (this->nScreenWidth / 2.0f / N_SCREEN_WORLD_RATIO);
-        
-        
-        Vector3D fScreenWorldStart;
-        fScreenWorldStart[0] = playerPos[0] - sinf(player.getAngle()) * (this->nScreenWidth / (2 * (float)N_SCREEN_WORLD_RATIO));
-        fScreenWorldStart[1] = playerPos[1] + this->fFocalLength;
-        fScreenWorldStart[2] = playerPos[2] + cosf(player.getAngle()) * (this->nScreenHeight / (2 * (float)N_SCREEN_WORLD_RATIO));
+
+        Vector3D screenCenterWorldPos = playerPos + Vector3D(cosf(playerAngle) * this->fFocalLength, sinf(playerAngle) * this->fFocalLength, 0.0f);
+        Vector3D screenRightVector = Vector3D(-sinf(playerAngle), cosf(playerAngle), 0.0f) * (this->nScreenWidth / 2.0f / (float)N_SCREEN_WORLD_RATIO);
+        Vector3D screenDownVector = Vector3D(0.0f, 0.0f, -1.0f) * (this->nScreenHeight / 2.0f / (float)N_SCREEN_WORLD_RATIO);
+        Vector3D v3ScreenTopLeft = screenCenterWorldPos - screenRightVector - screenDownVector;
 
         for (int y = 0; y < this->nScreenHeight; y++) 
         {
             for (int x = 0; x < this->nScreenWidth; x++)
             {
                 // Cast ray for every column
-                Vector3D currPoint;
-                currPoint[0] = fScreenWorldStart[0] + (x / (float)N_SCREEN_WORLD_RATIO);
-                currPoint[1] = fScreenWorldStart[1];
-                currPoint[2] = fScreenWorldStart[2] - (y / (float)N_SCREEN_WORLD_RATIO);
+                Vector3D currPoint = v3ScreenTopLeft + screenRightVector * 2.0f * (x / (float)this->nScreenWidth) + screenDownVector * 2.0f * (y / (float)this->nScreenHeight);
 
                 Vector3D v3RayDirection = currPoint - playerPos;
                 Line lRay(playerPos, v3RayDirection);
@@ -368,13 +434,13 @@ private:
                 WORD wColorToUse = 0;
                 for(GameObject* obj: this->objects)
                 {
-                    float localDistance = obj->getIntersectionDistance(lRay);
+                    std::pair<float, WORD> intersection = obj->getIntersection(lRay, this->fDepth);
                     
-                    if (localDistance > 0 && localDistance < fDistance) 
+                    if (intersection.first > 0 && intersection.first < fDistance) 
                     {
-                        fDistance = localDistance;
+                        fDistance = intersection.first;
                         wColorToUse = obj->getPixelColor();
-                        wCharToUse = obj->getCharByDistance(this->fDepth, fDistance);
+                        wCharToUse = intersection.second;
                     }
                 }
 

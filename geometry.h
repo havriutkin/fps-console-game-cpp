@@ -77,4 +77,9 @@ public:
 
 };
 
+class Quaternioin
+{
+
+};
+
 #endif
